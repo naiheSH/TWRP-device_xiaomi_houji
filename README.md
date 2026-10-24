@@ -62,6 +62,17 @@ Android 17 与向下兼容必须逐个验证 ROM、vendor 固件和安全补丁�
 
 详见 [测试记录与验证步骤](docs/TESTING.md)。LVGL 新 UI 属于上游实验功能，可能存在问题。
 
+已对本地官方包 `houji_images_OS3.0.307.0.WNCCNXM_16.0` 做轻量解包，
+确认原厂 recovery 为 v4、4 KiB 页、100 MiB 且不含内核，支持当前镜像布局。
+详见 [官方镜像检查记录](docs/STOCK-ROM.md)。该检查没有验证真机解密。
+
+## 浅克隆说明
+
+`--depth=1` 只省去旧提交的历史，保留所选提交的完整工作区文件。
+最小 manifest 则由上游移除与 recovery 构建无关的项目；这与 Git 浅克隆是两回事。
+工作流不会因为浅克隆而只下载部分 C/C++ 文件。它同步的是 recovery 构建所需项目，
+不是完整 Android ROM 源码集合。构建是否通过以 Actions 结果为准。
+
 ## 来源与致谢
 
 - 设备树：[QCerberusQ/OFRP-device_xiaomi_houji](https://github.com/QCerberusQ/OFRP-device_xiaomi_houji)，
