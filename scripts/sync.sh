@@ -6,7 +6,7 @@ exec > >(tee "$GITHUB_WORKSPACE/logs/sync.log") 2>&1
 cd "$SOURCE_DIR"
 repo init --depth=1 --no-clone-bundle \
   -u https://github.com/TWRP-Test/platform_manifest_twrp_aosp.git \
-  -b "$MANIFEST_REVISION"
+  -b "$MANIFEST_REVISION" --manifest-upstream-branch twrp-16.0
 mkdir -p .repo/local_manifests
 cat > .repo/local_manifests/houji.xml <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

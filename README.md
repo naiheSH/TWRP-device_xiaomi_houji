@@ -70,6 +70,8 @@ Android 17 与向下兼容必须逐个验证 ROM、vendor 固件和安全补丁�
   `814b553116ceedde197f70389cff9661d81d8337`。
 - recovery：[TWRP-Test/android_bootable_recovery](https://github.com/TWRP-Test/android_bootable_recovery/tree/twrp-16.0)，
   `0a9962492fc48b9af32cc9943de8ee7105a82af3`。
+- 云编译流程核对参考：[polygraphene 的 TWRP 16 工作流](https://github.com/polygraphene/android_device_lenovo_TB322FC/blob/twrp-16.0/.github/workflows/build.yml)。
+  本仓库使用自己的 houji 设备配置、分区目标和输入检查，不使用参考机型的设备树。
 
 保留原文件中的版权及许可证声明。原树中的厂商二进制文件沿用原始来源，
 此适配不对这些文件重新授予许可证。
