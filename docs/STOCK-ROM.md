@@ -102,7 +102,7 @@ The group size is the combined device capacity less 10,485,760 bytes. Current
 OS 3 extents are all on `super`, but the metadata permits future allocations on
 `super_ext`. Therefore a single-device group of 8,317,304,832 bytes is a
 possible legacy compatibility policy, not the OS 3 LP group value. The tree's
-11.8-GiB single-device values are invalid and must not be treated as stock
+11-GiB single-device values are invalid and must not be treated as stock
 layout. A recovery-only build with `PRODUCT_BUILD_SUPER_PARTITION := false`
 does not generate a super image; at runtime liblp reads the phone's current LP
 metadata. A full super-image build must instead model both block devices.

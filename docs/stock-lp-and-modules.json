@@ -1,0 +1,40 @@
+{
+  "source_package": "houji_images_OS3.0.307.0.WNCCNXM_16.0",
+  "geometry": {
+    "metadata_max_size": 65536,
+    "metadata_slot_count": 3,
+    "logical_block_size": 4096
+  },
+  "block_devices": [
+    {
+      "name": "super",
+      "size": 8321499136
+    },
+    {
+      "name": "super_ext",
+      "size": 2147483648
+    }
+  ],
+  "groups": [
+    {
+      "name": "qti_dynamic_partitions_a",
+      "maximum_size": 10458497024
+    },
+    {
+      "name": "qti_dynamic_partitions_b",
+      "maximum_size": 10458497024
+    }
+  ],
+  "vendor_dlkm_a": {
+    "size": 28143616,
+    "sha256": "b2207c9785bf312204dd0d55ee97d3085a320e3daa0cb2955bef18cc0441c508",
+    "module_name_checks": {
+      "adsp_loader_dlkm.ko": true,
+      "synaptics_tcm2.ko": true,
+      "nxp-nci.ko": true,
+      "stm_st54se_gpio.ko": true,
+      "stm_nfc_i2c.ko": true
+    },
+    "scope": "Module filename evidence, not an on-device load test."
+  }
+}
