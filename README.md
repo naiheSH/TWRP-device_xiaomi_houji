@@ -51,7 +51,9 @@ bash -n scripts/prepare-runner.sh scripts/sync.sh scripts/build.sh
 - KeyMint、Gatekeeper、Weaver、OMAPI 所需的原树文件。
 
 去除了 OrangeFox 的 makefile 和环境脚本，lunch 改为 Android 16 的三段目标。
-没有用其他 SM8650 机型的分区大小或固件覆盖 houji 的配置。
+按官方 houji 分区表及 sparse super 镜像头交叉核对，将原树错误的 super 大小
+修正为 `8321499136` 字节，动态分区组为 `8317304832` 字节（预留 4 MiB）。
+没有用其他 SM8650 机型的固件覆盖 houji 的文件。
 
 ## 兼容性与验证
 

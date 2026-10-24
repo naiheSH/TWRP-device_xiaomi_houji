@@ -71,6 +71,30 @@ recovery root supplies a separate Synaptics touch stack and pins those modules
 for that stack. It does mean the touch/NFC module configuration needs on-device
 testing on OS 3 rather than a filename-only update.
 
+## Super partition correction
+
+The original device tree has an incorrect 11,811,160,064-byte super size. The
+official partition XML and `rawprogram0.xml` agree that the `super` partition
+is 2,031,616 sectors of 4,096 bytes:
+
+```text
+2,031,616 * 4,096 = 8,321,499,136 bytes
+```
+
+The sparse super-image header independently reports 2,031,616 output blocks
+of 4,096 bytes. Its first raw block contains valid LP metadata geometry:
+64-KiB metadata slots, three slots and 4-KiB logical blocks. The standard
+4-MiB group reserve gives:
+
+```text
+BOARD_SUPER_PARTITION_SIZE          := 8321499136
+BOARD_QTI_DYNAMIC_PARTITIONS_SIZE   := 8317304832
+```
+
+`8,321,499,136 - 8,317,304,832 = 4,194,304` (4 MiB). The device tree should
+be corrected to these values before building; the old values reserve only
+1,318,576 bytes and describe a super partition that this device does not have.
+
 KeyMint, Gatekeeper, Weaver and QSEE executables are not embedded in the stock
 vendor-boot ramdisk, so this inspection cannot establish binary equivalence
 with the device tree's recovery-root copies without unpacking logical
