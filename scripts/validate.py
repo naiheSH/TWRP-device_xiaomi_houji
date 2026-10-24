@@ -14,8 +14,10 @@ assert 'device/xiaomi/houji' in product
 assert 'fox_houji.mk' not in device
 assert 'sm8650-common' not in device
 assert 'BOARD_RECOVERYIMAGE_PARTITION_SIZE := 104857600' in board
-assert 'BOARD_SUPER_PARTITION_SIZE := 8321499136' in board
-assert 'BOARD_QTI_DYNAMIC_PARTITIONS_SIZE := 8317304832' in board
+assert 'BOARD_SUPER_PARTITION_SIZE' not in board
+assert 'BOARD_SUPER_PARTITION_GROUPS' not in board
+assert 'PRODUCT_USE_DYNAMIC_PARTITIONS := true' in device
+assert 'PRODUCT_BUILD_SUPER_PARTITION := false' in device
 assert 'BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true' in board
 assert 'BOARD_BOOT_HEADER_VERSION     := 4' in board
 assert 'TARGET_PREBUILT_KERNEL' in board

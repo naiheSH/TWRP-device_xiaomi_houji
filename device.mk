@@ -28,6 +28,7 @@ PRODUCT_PLATFORM := xiaomi_sm8650
 
 # Dynamic partitions
 PRODUCT_USE_DYNAMIC_PARTITIONS := true
+PRODUCT_BUILD_SUPER_PARTITION := false
 
 # A/B
 ENABLE_VIRTUAL_AB := true

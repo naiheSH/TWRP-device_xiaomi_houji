@@ -2,9 +2,10 @@
 
 Source package: `houji_images_OS3.0.307.0.WNCCNXM_16.0`.
 
-This directory contains only CPIO file listings and selected text metadata. The
-temporary compressed ramdisks and their expanded CPIO archives were discarded
-after inspection; no `super.img` filesystem was expanded.
+This directory contains CPIO file listings, selected text metadata, and the
+single 28,143,616-byte `vendor_dlkm_a` logical extent. The temporary compressed
+ramdisks and their expanded CPIO archives were discarded after inspection; no
+other `super.img` filesystem was expanded.
 
 ## Image layout
 
@@ -83,17 +84,50 @@ is 2,031,616 sectors of 4,096 bytes:
 
 The sparse super-image header independently reports 2,031,616 output blocks
 of 4,096 bytes. Its first raw block contains valid LP metadata geometry:
-64-KiB metadata slots, three slots and 4-KiB logical blocks. The standard
-4-MiB group reserve gives:
+64-KiB metadata slots, three slots and 4-KiB logical blocks.
+
+The official LP metadata declares a second block device, `super_ext`, of
+2,147,483,648 bytes. Its exact logical-partition description is:
 
 ```text
-BOARD_SUPER_PARTITION_SIZE          := 8321499136
-BOARD_QTI_DYNAMIC_PARTITIONS_SIZE   := 8317304832
+block devices:
+  super      = 8,321,499,136 bytes
+  super_ext  = 2,147,483,648 bytes
+groups:
+  qti_dynamic_partitions_a = 10,458,497,024 bytes
+  qti_dynamic_partitions_b = 10,458,497,024 bytes
 ```
 
-`8,321,499,136 - 8,317,304,832 = 4,194,304` (4 MiB). The device tree should
-be corrected to these values before building; the old values reserve only
-1,318,576 bytes and describe a super partition that this device does not have.
+The group size is the combined device capacity less 10,485,760 bytes. Current
+OS 3 extents are all on `super`, but the metadata permits future allocations on
+`super_ext`. Therefore a single-device group of 8,317,304,832 bytes is a
+possible legacy compatibility policy, not the OS 3 LP group value. The tree's
+11.8-GiB single-device values are invalid and must not be treated as stock
+layout. A recovery-only build with `PRODUCT_BUILD_SUPER_PARTITION := false`
+does not generate a super image; at runtime liblp reads the phone's current LP
+metadata. A full super-image build must instead model both block devices.
+
+## vendor_dlkm module evidence
+
+Only the `vendor_dlkm_a` LP extent was mapped out of the sparse image (one
+28,143,616-byte extent); no other logical partition was extracted. Its EROFS
+metadata contains all five modules loaded by the recovery tree:
+
+```text
+adsp_loader_dlkm.ko
+synaptics_tcm2.ko
+nxp-nci.ko
+stm_st54se_gpio.ko
+stm_nfc_i2c.ko
+```
+
+It also contains `goodix_fod.ko` and `speed_touch.ko`. This confirms the
+recovery module names are valid for this OS 3 vendor_dlkm, including
+`synaptics_tcm2.ko`; the stock vendor-boot module list is simply not the
+source of those DLKM modules. No EROFS reader is installed locally, so the
+exact `modules.load` ordering was not extracted. Filename evidence supports
+retaining the current `TW_LOAD_VENDOR_MODULES` list; boot testing is still
+needed for module order and touch initialization.
 
 KeyMint, Gatekeeper, Weaver and QSEE executables are not embedded in the stock
 vendor-boot ramdisk, so this inspection cannot establish binary equivalence
@@ -106,3 +140,5 @@ partitions from the 7.2 GiB `super.img`. That was intentionally not done.
   CPIO path lists only.
 - `stock-selected/`: fstab, module lists, recovery init files and selected
   property files extracted from those CPIO archives.
+- `vendor_dlkm/vendor_dlkm_a.erofs`: the one mapped vendor_dlkm logical extent
+  used for the module-name check.

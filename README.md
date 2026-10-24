@@ -60,8 +60,9 @@ LVGL 动态库与 houji 触摸/解密文件是否被打包，不代表真机验�
 - KeyMint、Gatekeeper、Weaver、OMAPI 所需的原树文件。
 
 去除了 OrangeFox 的 makefile 和环境脚本，lunch 改为 Android 16 的三段目标。
-按官方 houji 分区表及 sparse super 镜像头交叉核对，将原树错误的 super 大小
-修正为 `8321499136` 字节，动态分区组为 `8317304832` 字节（预留 4 MiB）。
+独立 recovery 不硬编码 super 的设备数量、容量或分区组，
+明确关闭 super 镜像生成。运行时由 liblp 读取手机当前 ROM 的 LP 元数据，
+兼容传统单 super 和官方 OS3 声明的 super + super_ext 布局。
 没有用其他 SM8650 机型的固件覆盖 houji 的文件。
 
 ## 兼容性与验证

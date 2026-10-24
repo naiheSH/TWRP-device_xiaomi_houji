@@ -73,11 +73,8 @@ AB_OTA_PARTITIONS += \
 BOARD_PROPERTY_OVERRIDES_SPLIT_ENABLED := true
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 104857600
 
-# Dynamic Partition
-BOARD_SUPER_PARTITION_SIZE := 8321499136
-BOARD_SUPER_PARTITION_GROUPS := qti_dynamic_partitions
-BOARD_QTI_DYNAMIC_PARTITIONS_SIZE := 8317304832
-BOARD_QTI_DYNAMIC_PARTITIONS_PARTITION_LIST := odm product system system_dlkm system_ext vendor vendor_dlkm
+# Dynamic partition devices, groups and capacities are read from the current
+# ROM's LP metadata at runtime. This tree does not construct super images.
 
 # File systems
 TARGET_USERIMAGES_USE_EXT4 := true
