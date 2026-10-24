@@ -1,0 +1,64 @@
+name: Build houji LVGL recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobs:
+        description: Parallel build jobs (lower this if the runner runs out of memory)
+        type: choice
+        options: ['4', '2']
+        default: '4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: houji-recovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  recovery:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    env:
+      BUILD_JOBS: ${{ inputs.jobs }}
+      SOURCE_DIR: /mnt/twrp
+      MANIFEST_REVISION: 814b553116ceedde197f70389cff9661d81d8337
+      RECOVERY_REVISION: 0a9962492fc48b9af32cc9943de8ee7105a82af3
+      ALLOW_MISSING_DEPENDENCIES: 'true'
+      LC_ALL: C
+    steps:
+      - name: Checkout houji device tree
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Validate houji inputs
+        run: python3 scripts/validate.py
+
+      - name: Prepare GitHub runner
+        run: bash scripts/prepare-runner.sh
+
+      - name: Sync minimal TWRP-Test source and LVGL
+        run: bash scripts/sync.sh
+
+      - name: Build dedicated houji recovery image
+        run: bash scripts/build.sh
+
+      - name: Upload recovery image and source revisions
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: twrp-lvgl-houji-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload logs even when the build fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: houji-build-logs-${{ github.run_number }}
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 14
