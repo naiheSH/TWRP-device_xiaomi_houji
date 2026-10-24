@@ -4,6 +4,8 @@ from pathlib import Path
 import hashlib
 import re
 
+import vintfcheck
+
 root = Path(__file__).resolve().parents[1]
 board = (root / 'BoardConfig.mk').read_text()
 device = (root / 'device.mk').read_text()
@@ -42,3 +44,7 @@ for p in root.rglob('*'):
         assert p.stat().st_size < 100 * 1024 * 1024, f'GitHub file too large: {p}'
 print('houji identity, recovery layout, ARM64 prebuilt, FBE configuration: OK')
 print('kernel SHA256:', hashlib.sha256(kernel.read_bytes()).hexdigest())
+
+vintf = vintfcheck.check_source(root)
+assert not vintf['missing'] and not vintf['errors'], vintf
+print('recovery system VINTF declarations: OK')

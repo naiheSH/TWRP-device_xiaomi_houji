@@ -8,6 +8,7 @@ import struct
 import subprocess
 
 import elfcheck
+import vintfcheck
 
 
 def cpio_entries(data):
@@ -61,6 +62,10 @@ def main():
         ).stdout
     entries = cpio_entries(ramdisk)
     elf_report = elfcheck.check_image(image)
+    vintf_report = vintfcheck.check_files({
+        name: entry.data for name, entry in elfcheck.unpack_recovery(image).items()
+        if name.startswith("system/etc/vintf/")
+    })
     required = [
         'init.recovery.qcom.rc',
         'vendor/bin/prepdecrypt.sh',
@@ -87,14 +92,15 @@ def main():
         'houji_files': {name: entries.get(name) for name in required},
         'missing': missing,
         'elf_check': elf_report,
+        'recovery_vintf': vintf_report,
         'scope': 'Packaging inspection only; boot and data decryption are unverified.',
     }
     rendered = json.dumps(report, indent=2, ensure_ascii=False) + '\n'
     print(rendered, end='')
     if args.report:
         args.report.write_text(rendered)
-    if missing or elf_report['failures']:
-        raise SystemExit('Recovery image has missing required files or an ELF closure failure')
+    if missing or elf_report['failures'] or vintf_report['missing'] or vintf_report['errors']:
+        raise SystemExit('Recovery image has missing files, an ELF closure failure, or incomplete recovery VINTF')
 
 
 if __name__ == '__main__':

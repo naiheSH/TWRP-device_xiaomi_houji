@@ -1,0 +1,8 @@
+<!-- hwservicemanager uses the ordinary framework manifest even in recovery. -->
+<manifest version="1.0" type="framework">
+    <hal format="hidl">
+        <name>android.hidl.manager</name>
+        <transport>hwbinder</transport>
+        <fqname>@1.2::IServiceManager/default</fqname>
+    </hal>
+</manifest>

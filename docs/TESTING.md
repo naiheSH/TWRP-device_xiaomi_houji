@@ -1,6 +1,6 @@
 # houji 真机测试记录
 
-目标机型：Xiaomi 14（houji）。当前无真机测试结果，不能标记为稳定版。
+目标机型：Xiaomi 14（houji）。run 3 在官方 OS3.0.307.0.WNCCNXM / Android 16 上启动失败，不能标记为稳定版。
 
 | 系统 | 启动 | 显示/触摸 | ADB/MTP | 动态分区 | 无密码解密 | PIN/密码解密 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -38,3 +38,11 @@ adb shell dmesg > recovery-dmesg.txt
 
 分享日志前检查是否含个人信息。记录故障步骤、密码类型（不记录密码内容）、
 是否能正常返回原系统，以及是否涉及触摸或 vendor 模块加载失败。
+
+## 已知真机结果
+
+run 3 曾进入 LVGL 启动页面及 recovery ADB，随后因 KeyMint VINTF 声明不可见、
+Keystore2 连续崩溃，在约25.6秒触发 init critical 重启到 bootloader。
+已刷回对应官方 recovery，核对 A/B 镜像哈希并确认 Android 开机完成。
+VINTF 修复后的镜像必须重新验证，特别是 KeyMint 注册、Keystore 存活与 UI 完成启动。
+当前 /data 的 mifs 识别和挂载失败尚未解决，不应声称解密兼容已通过。

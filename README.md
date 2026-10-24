@@ -109,3 +109,12 @@ Android 17 与向下兼容必须逐个验证 ROM、vendor 固件和安全补丁�
 
 保留原文件中的版权及许可证声明。原树中的厂商二进制文件沿用原始来源，
 此适配不对这些文件重新授予许可证。
+
+## 启动修复进展
+
+run 3 真机复测已确认：vendor HAL 的声明没有进入 Android 16 recovery
+读取的 system VINTF 路径，KeyMint 注册被拒，Keystore2 连续崩溃后触发
+init critical 重启进入 bootloader。官方 recovery 已恢复，系统正常开机。
+本次修复将声明安装到 system recovery fragments，并增加最终镜像与
+Android 原生 VINTF 合并检查；新镜像启动与解密结果仍待验证。
+详见 [VINTF 修复审查](docs/VINTF-REPAIR-REVIEW.md)。

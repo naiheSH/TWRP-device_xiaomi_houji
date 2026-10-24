@@ -11,7 +11,7 @@ source build/envsetup.sh
 # The Android 16 build fork requires product + release configuration + variant.
 lunch twrp_houji bp2a eng
 [[ $(get_build_var TARGET_DEVICE) == houji ]]
-mka -j"$BUILD_JOBS" recoveryimage
+mka -j"$BUILD_JOBS" recoveryimage assemble_vintf
 platform_libcxx=out/target/product/houji/system/lib64/libc++.so
 ramdisk_libcxx=out/target/product/houji/recovery/root/system/lib64/libc++.so
 test -s "$platform_libcxx"
@@ -22,6 +22,26 @@ if ! cmp -s "$platform_libcxx" "$ramdisk_libcxx"; then
   echo 'Recovery libc++.so differs from the Android platform build output.' >&2
   exit 1
 fi
+# Use Android's own parser to merge the actual staged recovery manifests.
+# All system fragments are framework-typed for hwservicemanager; recovery's
+# VintfObjectRecovery deliberately treats the same declarations as device HALs.
+vintf_root=out/target/product/houji/recovery/root/system/etc/vintf
+vintf_inputs="$vintf_root/manifest.xml"
+for fragment in "$vintf_root/manifest/"*.xml; do
+  test -s "$fragment"
+  vintf_inputs+=":$fragment"
+done
+out/host/linux-x86/bin/assemble_vintf -i "$vintf_inputs" \
+  -o "$GITHUB_WORKSPACE/logs/recovery-vintf-assembled.xml"
+python3 - "$GITHUB_WORKSPACE" <<'PYVINTF'
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(sys.argv[1]) / 'scripts'))
+import vintfcheck
+merged = Path(sys.argv[1]) / 'logs/recovery-vintf-assembled.xml'
+report = vintfcheck.check_files({vintfcheck.SYSTEM_BASE: merged.read_bytes()})
+assert not report['missing'] and not report['errors'], report
+PYVINTF
 image=out/target/product/houji/recovery.img
 test -s "$image"
 python3 - "$image" <<'PY'
@@ -42,6 +62,8 @@ cp "$GITHUB_WORKSPACE/logs/device-commit.txt" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/image-inspection.json" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/libcxx-selection.sha256" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/docs/TESTING.md" "$GITHUB_WORKSPACE/artifacts/"
+cp "$GITHUB_WORKSPACE/logs/recovery-vintf-assembled.xml" "$GITHUB_WORKSPACE/artifacts/"
+cp "$GITHUB_WORKSPACE/docs/VINTF-REPAIR-REVIEW.md" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/docs/RUNTIME-REPAIR-REVIEW.md" "$GITHUB_WORKSPACE/artifacts/"
 cd "$GITHUB_WORKSPACE/artifacts"
 sha256sum ./*.img > SHA256SUMS
