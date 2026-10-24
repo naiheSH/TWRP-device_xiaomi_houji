@@ -43,6 +43,15 @@ python3 scripts/validate.py
 bash -n scripts/prepare-runner.sh scripts/sync.sh scripts/build.sh
 ```
 
+云端产物下载后，可使用 Python 3 和 `lz4` 检查镜像头及 ramdisk 内容：
+
+```sh
+python3 scripts/inspect-image.py /path/to/recovery.img --report image-inspection.json
+```
+
+该检查不编译源码，也不把镜像文件写入手机；它检查无内核 v4 镜像、大小上限、
+LVGL 动态库与 houji 触摸/解密文件是否被打包，不代表真机验证通过。
+
 ## 已保留的 houji 配置
 
 - boot header v4、GKI、A/B、Virtual A/B、独立 recovery 分区。
