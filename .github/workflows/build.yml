@@ -34,7 +34,9 @@ jobs:
           persist-credentials: false
 
       - name: Validate houji inputs
-        run: python3 scripts/validate.py
+        run: |
+          python3 scripts/validate.py
+          python3 -m unittest discover -s tests -v
 
       - name: Prepare GitHub runner
         run: bash scripts/prepare-runner.sh

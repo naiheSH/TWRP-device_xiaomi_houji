@@ -3,6 +3,12 @@
 基于本地 `OFRP-device_xiaomi_houji` 转换的实验性 recovery 设备树。
 仅使用 GitHub Actions 云编译，不在本机同步完整 Android 源码或编译镜像。
 
+已确认第 2 次云构建的镜像存在启动故障：旧设备树覆盖了平台 `libc++.so`，
+导致 Android 16 的 `init` 缺少 C++ 符号并触发 kernel panic。
+当前修复移除该覆盖，并在上传产物前检查最终 ramdisk 的 ELF 依赖。
+修复后的镜像仍需重新云编译和真机验证。
+修复范围和剩余验证项见 [运行库修复审查](docs/RUNTIME-REPAIR-REVIEW.md)。
+
 ## 机型与源码
 
 | 项目 | 配置 |
@@ -40,6 +46,7 @@ workflow 只手动触发，使用标准 GitHub hosted `ubuntu-22.04` runner，
 
 ```sh
 python3 scripts/validate.py
+python3 -m unittest discover -s tests -v
 bash -n scripts/prepare-runner.sh scripts/sync.sh scripts/build.sh
 ```
 
@@ -50,7 +57,8 @@ python3 scripts/inspect-image.py /path/to/recovery.img --report image-inspection
 ```
 
 该检查不编译源码，也不把镜像文件写入手机；它检查无内核 v4 镜像、大小上限、
-LVGL 动态库与 houji 触摸/解密文件是否被打包，不代表真机验证通过。
+LVGL 动态库、houji 触摸/解密文件，以及关键进程的 ELF 依赖。
+检查通过仍不代表真机启动、触摸或解密验证通过。
 
 ## 已保留的 houji 配置
 

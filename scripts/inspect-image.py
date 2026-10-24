@@ -7,6 +7,8 @@ from pathlib import Path
 import struct
 import subprocess
 
+import elfcheck
+
 
 def cpio_entries(data):
     entries = {}
@@ -58,6 +60,7 @@ def main():
             stderr=subprocess.PIPE, check=True,
         ).stdout
     entries = cpio_entries(ramdisk)
+    elf_report = elfcheck.check_image(image)
     required = [
         'init.recovery.qcom.rc',
         'vendor/bin/prepdecrypt.sh',
@@ -83,14 +86,15 @@ def main():
         'lvgl_libraries': libraries,
         'houji_files': {name: entries.get(name) for name in required},
         'missing': missing,
+        'elf_check': elf_report,
         'scope': 'Packaging inspection only; boot and data decryption are unverified.',
     }
     rendered = json.dumps(report, indent=2, ensure_ascii=False) + '\n'
     print(rendered, end='')
     if args.report:
         args.report.write_text(rendered)
-    if missing:
-        raise SystemExit('Recovery image is missing required houji/LVGL files')
+    if missing or elf_report['failures']:
+        raise SystemExit('Recovery image has missing required files or an ELF closure failure')
 
 
 if __name__ == '__main__':

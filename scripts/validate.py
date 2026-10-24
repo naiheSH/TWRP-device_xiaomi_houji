@@ -28,6 +28,10 @@ assert kernel.stat().st_size > 1024 * 1024
 assert kernel.read_bytes()[0x38:0x3c] == b'ARM\x64', 'Invalid ARM64 Image header'
 assert not (root / 'vendorsetup.sh').exists(), 'OrangeFox environment must not be sourced'
 assert not (root / 'fox_houji.mk').exists()
+libcxx_overlay = root / 'recovery/root/system/lib64/libc++.so'
+assert not (libcxx_overlay.exists() or libcxx_overlay.is_symlink()), (
+    'Do not overwrite the Android platform libc++.so with a device prebuilt'
+)
 assert 'twrp_houji-bp2a-eng' in (root / 'AndroidProducts.mk').read_text()
 fstab = (root / 'recovery.fstab').read_text()
 assert 'fileencryption=' in fstab and 'metadata_encryption=' in fstab
