@@ -1,120 +1,110 @@
-# Xiaomi 14 (houji) — TWRP-Test LVGL recovery
+# TWRP for Xiaomi 14 (houji)
 
-基于本地 `OFRP-device_xiaomi_houji` 转换的实验性 recovery 设备树。
-仅使用 GitHub Actions 云编译，不在本机同步完整 Android 源码或编译镜像。
+An experimental Xiaomi 14 recovery device tree for TWRP-Test's LVGL interface.
+Images are built with GitHub Actions using the Android 16 `twrp-16.0` source
+baseline. Boot and user-data decryption have been confirmed on HyperOS
+`OS3.0.307.0.WNCCNXM` (Android 16). Other ROM and firmware combinations still
+need validation.
 
-已确认第 2 次云构建的镜像存在启动故障：旧设备树覆盖了平台 `libc++.so`，
-导致 Android 16 的 `init` 缺少 C++ 符号并触发 kernel panic。
-当前修复移除该覆盖，并在上传产物前检查最终 ramdisk 的 ELF 依赖。
-修复后的镜像仍需重新云编译和真机验证。
-修复范围和剩余验证项见 [运行库修复审查](docs/RUNTIME-REPAIR-REVIEW.md)。
+## Device
 
-## 机型与源码
-
-| 项目 | 配置 |
+| Item | Configuration |
 | --- | --- |
-| 设备 | Xiaomi 14 / houji，原设备树包含 houjiin 识别 |
-| SoC | Qualcomm SM8650 |
-| 编译目标 | `twrp_houji-bp2a-eng` / `recoveryimage` |
-| 镜像 | 独立 `recovery.img`，100 MiB 分区上限 |
-| UI | TWRP-Test 的 LVGL `gui2` |
-| 构建底座 | Android 16，TWRP-Test `twrp-16.0` |
-| 运行兼容目标 | Android 14–17；尚未完成真机兼容验证 |
+| Device | Xiaomi 14 (`houji`; inherited device assertions also include `houjiin`) |
+| Platform | Qualcomm SM8650 |
+| Product | `twrp_houji` |
+| Lunch target | `twrp_houji bp2a eng` |
+| Build target | `recoveryimage` |
+| Image | Dedicated `recovery.img`, up to 100 MiB |
+| Interface | TWRP-Test LVGL `gui2` |
+| Source baseline | Android 16 / `twrp-16.0` |
 
-截至 2026-10-24，上游 manifest 和 recovery 仓库实际没有 `main` 分支，
-LVGL 已合并在 `twrp-16.0`。工作流固定 manifest 和 recovery 的提交，
-同步完成后输出所有依赖的实际 revision 清单。
+This is a standalone recovery tree. The LineageOS `lineage-24.0` device and
+SM8650 common trees are not dependencies. An Android 17 ROM device tree does
+not by itself provide Android 17 recovery or data-decryption compatibility.
 
-**Android 17 的 LineageOS `lineage-24.0` 完整 ROM 树不用于此构建。**
-`lolipuru/device_xiaomi_sm8650-common` 与 `android_device_xiaomi_houji`
-需要完整 ROM 的 HAL、sepolicy 和 vendor 依赖；此 recovery 树已自带所需的机型配置、
-预编译内核和专用 ramdisk 文件。不能通过切换到 Lineage 24 的设备树，就获得 Android 17 通用解密。
+See [device configuration](docs/DEVICE.md) for image layout, encryption and
+logical-partition details.
 
-## GitHub 云编译
+## Build with GitHub Actions
 
-1. 打开此仓库的 **Actions → Build houji LVGL recovery → Run workflow**。
-2. 默认 4 个并行任务；内存不足时改为 2。
-3. 成功后下载 `twrp-lvgl-houji-<运行序号>` artifact，内含 `.img`、
-   `SHA256SUMS`、源码 revision 清单及测试说明。
-4. 失败也会保留 `houji-build-logs-<运行序号>`，可据此修复后重新触发。
+1. Open **Actions → Build houji LVGL recovery → Run workflow**.
+2. Choose **4** parallel jobs, or **2** if the runner runs out of memory.
+3. Download the `twrp-lvgl-houji-<run-number>` artifact after a successful build.
+4. Verify the image against the included `SHA256SUMS` before installing it.
 
-workflow 只手动触发，使用标准 GitHub hosted `ubuntu-22.04` runner，
-不自动创建 Release，也不对连接的手机执行任何命令。
-构建时清理、安装依赖和 swap 仅在一次性的云端 runner 执行。
+Artifacts include the image, source revisions, image inspection results and
+assembled recovery VINTF manifest. Failed builds retain a
+`houji-build-logs-<run-number>` artifact.
 
-本地仅做静态检查：
+The workflow runs only on manual dispatch, uses a GitHub-hosted
+`ubuntu-22.04` runner and does not create releases or operate connected devices.
+Image artifacts are retained for 30 days and build logs for 14 days. Persistent
+source or compiler caching is not currently configured.
+
+The manifest and recovery revisions are pinned in
+[the workflow](.github/workflows/build.yml). A resolved source manifest is
+saved with every build. Shallow clones retain the complete files at the chosen
+revision; the minimal manifest selects the projects needed for recovery.
+
+## Local checks
+
+Local checks do not compile Android or flash a device:
 
 ```sh
 python3 scripts/validate.py
 python3 -m unittest discover -s tests -v
-bash -n scripts/prepare-runner.sh scripts/sync.sh scripts/build.sh
+bash -n scripts/*.sh
 ```
 
-云端产物下载后，可使用 Python 3 和 `lz4` 检查镜像头及 ramdisk 内容：
+After downloading an image, inspect it with Python 3 and `lz4`:
 
 ```sh
-python3 scripts/inspect-image.py /path/to/recovery.img --report image-inspection.json
+python3 scripts/inspect-image.py path/to/recovery.img --report inspection.json
 ```
 
-该检查不编译源码，也不把镜像文件写入手机；它检查无内核 v4 镜像、大小上限、
-LVGL 动态库、houji 触摸/解密文件，以及关键进程的 ELF 依赖。
-检查通过仍不代表真机启动、触摸或解密验证通过。
+The inspector checks the image layout and size, required device files, LVGL
+libraries, key ELF dependencies and recovery-visible VINTF declarations.
+Cloud builds additionally compare the platform and ramdisk C++ libraries and
+merge the staged VINTF manifests with Android's native `assemble_vintf` tool.
+These checks do not replace device validation.
 
-## 已保留的 houji 配置
+## Usage and compatibility
 
-- boot header v4、GKI、A/B、Virtual A/B、独立 recovery 分区。
-- 原设备树的预编译内核、ramdisk、触摸服务及 vendor 模块加载顺序。
-- F2FS、FBE v2、metadata encryption，以及 EROFS/ext4 logical 分区配置。
-- KeyMint、Gatekeeper、Weaver、OMAPI 所需的原树文件。
+- Keep the matching stock recovery available before installing an image.
+- This recovery image has no embedded kernel. The tree does not provide a
+  validated `fastboot boot` procedure.
+- Confirm boot, input and data access for the exact ROM, vendor firmware and
+  security patch combination in use. Android 14, 15 and 17 remain unverified.
+- Backup/restore, ZIP installation, MTP transfers, USB-OTG and long-term
+  stability have not been fully validated.
+- To return from the legacy default theme to LVGL, choose **Reboot → Recovery**.
+  Switching to the legacy interface lasts for the current recovery session;
+  LVGL starts again on the next recovery boot. Decryption may be required again.
 
-去除了 OrangeFox 的 makefile 和环境脚本，lunch 改为 Android 16 的三段目标。
-独立 recovery 不硬编码 super 的设备数量、容量或分区组，
-明确关闭 super 镜像生成。运行时由 liblp 读取手机当前 ROM 的 LP 元数据，
-兼容传统单 super 和官方 OS3 声明的 super + super_ext 布局。
-没有用其他 SM8650 机型的固件覆盖 houji 的文件。
+Read-only diagnostic collection:
 
-## 兼容性与验证
+```sh
+adb pull /tmp/recovery.log
+adb shell getprop > recovery-properties.txt
+adb shell cat /proc/mounts > recovery-mounts.txt
+adb shell dmesg > recovery-dmesg.txt
+```
 
-编译成功仅代表源码和打包通过，不能证明可启动、触摸正常或能够解密 `/data`。
-Android 17 与向下兼容必须逐个验证 ROM、vendor 固件和安全补丁组合。
-本树保留的 prepdecrypt 脚本会读取当前系统的版本及补丁信息，
-但这不能替代真实设备的 KeyMint/Weaver/metadata 解密测试。
+Remove personal information before sharing logs. Do not include lock-screen
+credentials. Formatting data is not a substitute for working decryption.
 
-详见 [测试记录与验证步骤](docs/TESTING.md)。LVGL 新 UI 属于上游实验功能，可能存在问题。
+## Sources and credits
 
-已对本地官方包 `houji_images_OS3.0.307.0.WNCCNXM_16.0` 做轻量解包，
-确认原厂 recovery 为 v4、4 KiB 页、100 MiB 且不含内核，支持当前镜像布局。
-详见 [官方镜像检查记录](docs/STOCK-ROM.md)。该检查没有验证真机解密。
+- Device tree: [QCerberusQ/OFRP-device_xiaomi_houji](https://github.com/QCerberusQ/OFRP-device_xiaomi_houji),
+  `fox_14.1`, revision `9f7455903b570814b2e0cdcdbe5328eaa55e9cf6`.
+- Manifest: [TWRP-Test/platform_manifest_twrp_aosp](https://github.com/TWRP-Test/platform_manifest_twrp_aosp/tree/twrp-16.0),
+  revision `814b553116ceedde197f70389cff9661d81d8337`.
+- Recovery: [TWRP-Test/android_bootable_recovery](https://github.com/TWRP-Test/android_bootable_recovery/tree/twrp-16.0),
+  revision `0a9962492fc48b9af32cc9943de8ee7105a82af3`.
+- Workflow reference: [polygraphene/android_device_lenovo_TB322FC](https://github.com/polygraphene/android_device_lenovo_TB322FC/blob/twrp-16.0/.github/workflows/build.yml).
+- Platform reference: [YuKongA/twrp_device_xiaomi_sm8850](https://github.com/YuKongA/twrp_device_xiaomi_sm8850/tree/twrp-16.0).
+  Its Xiaomi 17 kernel, firmware, HALs and partition geometry are not used here.
 
-## 浅克隆说明
-
-`--depth=1` 只省去旧提交的历史，保留所选提交的完整工作区文件。
-最小 manifest 则由上游移除与 recovery 构建无关的项目；这与 Git 浅克隆是两回事。
-工作流不会因为浅克隆而只下载部分 C/C++ 文件。它同步的是 recovery 构建所需项目，
-不是完整 Android ROM 源码集合。构建是否通过以 Actions 结果为准。
-
-## 来源与致谢
-
-- 设备树：[QCerberusQ/OFRP-device_xiaomi_houji](https://github.com/QCerberusQ/OFRP-device_xiaomi_houji)，
-  `fox_14.1`，原始提交 `9f7455903b570814b2e0cdcdbe5328eaa55e9cf6`。
-- manifest：[TWRP-Test/platform_manifest_twrp_aosp](https://github.com/TWRP-Test/platform_manifest_twrp_aosp/tree/twrp-16.0)，
-  `814b553116ceedde197f70389cff9661d81d8337`。
-- recovery：[TWRP-Test/android_bootable_recovery](https://github.com/TWRP-Test/android_bootable_recovery/tree/twrp-16.0)，
-  `0a9962492fc48b9af32cc9943de8ee7105a82af3`。
-- 云编译流程核对参考：[polygraphene 的 TWRP 16 工作流](https://github.com/polygraphene/android_device_lenovo_TB322FC/blob/twrp-16.0/.github/workflows/build.yml)。
-  本仓库使用自己的 houji 设备配置、分区目标和输入检查，不使用参考机型的设备树。
-- 小米平台对照：[YuKongA/twrp_device_xiaomi_sm8850](https://github.com/YuKongA/twrp_device_xiaomi_sm8850/tree/twrp-16.0)，
-  核对过 FBE/OMAPI、模块加载时序与云编译配置。该树面向小米 17 系列，
-  其 API 36、内核、固件、HAL 和分区容量不用于 houji。
-
-保留原文件中的版权及许可证声明。原树中的厂商二进制文件沿用原始来源，
-此适配不对这些文件重新授予许可证。
-
-## 启动修复进展
-
-run 3 真机复测已确认：vendor HAL 的声明没有进入 Android 16 recovery
-读取的 system VINTF 路径，KeyMint 注册被拒，Keystore2 连续崩溃后触发
-init critical 重启进入 bootloader。官方 recovery 已恢复，系统正常开机。
-本次修复将声明安装到 system recovery fragments，并增加最终镜像与
-Android 原生 VINTF 合并检查；新镜像启动与解密结果仍待验证。
-详见 [VINTF 修复审查](docs/VINTF-REPAIR-REVIEW.md)。
+Original copyright and license notices are retained. Vendor binaries retain
+their original provenance; this adaptation does not relicense them.

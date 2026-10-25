@@ -61,10 +61,7 @@ cp "$GITHUB_WORKSPACE/logs/source-manifest.xml" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/device-commit.txt" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/image-inspection.json" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/libcxx-selection.sha256" "$GITHUB_WORKSPACE/artifacts/"
-cp "$GITHUB_WORKSPACE/docs/TESTING.md" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/recovery-vintf-assembled.xml" "$GITHUB_WORKSPACE/artifacts/"
-cp "$GITHUB_WORKSPACE/docs/VINTF-REPAIR-REVIEW.md" "$GITHUB_WORKSPACE/artifacts/"
-cp "$GITHUB_WORKSPACE/docs/RUNTIME-REPAIR-REVIEW.md" "$GITHUB_WORKSPACE/artifacts/"
 cd "$GITHUB_WORKSPACE/artifacts"
 sha256sum ./*.img > SHA256SUMS
 {
