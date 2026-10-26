@@ -32,6 +32,7 @@ disabled) cp "$WORK/dhcp.request" "$WORK/dhcp.ok"; echo stopped > "$WORK/wpa-sta
 failed) cp "$WORK/dhcp.request" "$WORK/dhcp.failed";;
 esac
 ''',
+                'busybox': 'tool=$1; shift; exec "$tool" "$@"\n',
                 'ip': 'echo "ip $*" >> "$WORK/events"\n',
                 'setprop': 'exit 0\n',
                 'sleep': 'exit 0\n',

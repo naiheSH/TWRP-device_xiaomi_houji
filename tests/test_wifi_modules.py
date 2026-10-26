@@ -10,7 +10,7 @@ LOADER = 'load_module() (' + LOADER
 
 
 class ModuleGraphTests(unittest.TestCase):
-    def run_graph(self, dependencies, files, builtin=()):
+    def run_graph(self, dependencies, files, builtin=(), system_files=()):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             modules = root / 'modules'
@@ -18,6 +18,11 @@ class ModuleGraphTests(unittest.TestCase):
             (modules / 'modules.dep').write_text(dependencies)
             for name in files:
                 (modules / name).touch()
+            system_modules = root / 'system-modules'
+            system_modules.mkdir()
+            (system_modules / 'modules.dep').write_text('')
+            for name in system_files:
+                (system_modules / name).touch()
             sys_module = root / 'sys-module'
             sys_module.mkdir()
             for name in builtin:
@@ -26,10 +31,11 @@ class ModuleGraphTests(unittest.TestCase):
             loader = LOADER.replace('/sys/module/', str(sys_module) + '/')
             shell = '''set -eu
 modules=$1
+system_modules=$2
 note() { echo "$*" >&2; }
 insmod() { basename "$1"; }
 ''' + loader + '\nload_module radio.ko\n'
-            return subprocess.run(['sh', '-c', shell, 'fixture', str(modules)],
+            return subprocess.run(['sh', '-c', shell, 'fixture', str(modules), str(system_modules)],
                                   capture_output=True, text=True, timeout=5)
 
     def test_dependency_is_loaded_before_driver(self):
@@ -52,3 +58,15 @@ insmod() { basename "$1"; }
         r = self.run_graph('radio.ko: bus.ko\nbus.ko: radio.ko\n', ['radio.ko', 'bus.ko'])
         self.assertNotEqual(0, r.returncode)
         self.assertIn('dependency depth exceeded', r.stderr)
+
+    def test_cfg80211_loads_omitted_rfkill_dependency_from_system_dlkm(self):
+        r = self.run_graph('radio.ko: cfg80211.ko\ncfg80211.ko:\n',
+                           ['radio.ko', 'cfg80211.ko'], system_files=['rfkill.ko'])
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertEqual(['rfkill.ko', 'cfg80211.ko', 'radio.ko'], r.stdout.splitlines())
+
+    def test_cfg80211_without_rfkill_fails_before_insertion(self):
+        r = self.run_graph('radio.ko: cfg80211.ko\ncfg80211.ko:\n',
+                           ['radio.ko', 'cfg80211.ko'])
+        self.assertNotEqual(0, r.returncode)
+        self.assertEqual('', r.stdout)

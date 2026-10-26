@@ -26,8 +26,8 @@ finish_attempt() {
 }
 trap finish_attempt EXIT
 trap 'exit 1' HUP INT TERM
-ip route flush dev wlan0
-ip addr flush dev wlan0
+busybox ip route flush dev wlan0
+busybox ip addr flush dev wlan0
 for property in ipaddress gateway dns1 dns2; do setprop "net.wlan0.$property" ''; done
 : > "$work/resolv.conf"
 rm -f "$work/dhcp.ok" "$work/dhcp.failed"

@@ -2,12 +2,14 @@
 import elfcheck
 
 REQUIRED = (
-    'system/bin/wpa_supplicant', 'system/bin/wpa_cli', 'system/bin/dhcpdbg',
+    'system/bin/wpa_supplicant', 'system/bin/wpa_cli',
+    'system/bin/houji-wifi-udhcpc-event',
     'system/bin/houji-wifi-control', 'system/bin/houji-wifi-dhcp',
+    'system/bin/busybox',
     'system/etc/init/houji-wifi.rc', 'system/etc/wifi/houji.conf',
     'vendor/etc/wifi/kiwi_v2/WCNSS_qcom_cfg.ini',
 )
-EXECUTABLES = REQUIRED[:5]
+EXECUTABLES = REQUIRED[:6]
 
 
 def check(entries):
@@ -22,7 +24,7 @@ def check(entries):
     containers = [entries.get(p) for p in ('system/bin/recovery', 'system/lib64/libgui2.so')]
     if not any(e and b'houji-wifi-dhcp ' in e.data for e in containers):
         errors.append('GUI2 does not invoke the controlled DHCP helper')
-    binaries = ('system/bin/wpa_supplicant', 'system/bin/wpa_cli', 'system/bin/dhcpdbg')
+    binaries = ('system/bin/wpa_supplicant', 'system/bin/wpa_cli')
     checks = elfcheck.check_entries(entries, binaries)
     failures = {name: value for name, value in checks.items()
                 if value['error'] or value['missing_libraries'] or value['missing_strong_symbols']}

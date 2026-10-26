@@ -28,8 +28,8 @@ stop_dhcp() {
 }
 clear_network() {
     if [ -e "/sys/class/net/$iface" ]; then
-        ip route flush dev "$iface" || true
-        ip addr flush dev "$iface" || true
+        busybox ip route flush dev "$iface" || true
+        busybox ip addr flush dev "$iface" || true
     fi
     for property in ipaddress gateway dns1 dns2; do
         setprop "net.$iface.$property" '' || true
@@ -56,15 +56,25 @@ load_module() (
     [ -d "/sys/module/$module" ] && exit 0
     depth=${2:-0}
     [ "$depth" -lt 50 ] || { note 'module dependency depth exceeded'; exit 1; }
-    [ -f "$modules/$name" ] || { note "missing kernel module $name"; exit 1; }
+    directory=''
+    for candidate in "$modules" "${system_modules:-/nonexistent}" /lib/modules; do
+        if [ -f "$candidate/$name" ]; then directory=$candidate; break; fi
+    done
+    [ -n "$directory" ] || { note "missing kernel module $name"; exit 1; }
+    # Xiaomi's vendor modules.dep omits this GKI dependency. The stock OS loads
+    # rfkill separately from system_dlkm; cfg80211 cannot resolve its symbols
+    # without it, even though its own modules.dep entry has no dependencies.
+    if [ "$module" = cfg80211 ]; then
+        load_module rfkill.ko "$((depth + 1))" || exit 1
+    fi
     dependencies=$(awk -v name="$name:" '
         { key=$1; sub(/^.*\//, "", key); if (key == name) {
             for (i=2;i<=NF;i++) print $i; exit
-        }}' "$modules/modules.dep")
+        }}' "$directory/modules.dep" 2>/dev/null || true)
     for dependency in $dependencies; do
         load_module "$dependency" "$((depth + 1))" || exit 1
     done
-    insmod "$modules/$name" || { note "kernel rejected $name"; exit 1; }
+    insmod "$directory/$name" || { note "kernel rejected $name"; exit 1; }
     if [ "$module" = cnss2 ] && [ -w /sys/kernel/cnss/fs_ready ]; then
         echo 1 > /sys/kernel/cnss/fs_ready
     fi
@@ -100,8 +110,12 @@ prepare() {
     mkdir -p /vendor/firmware/wlan/qca_cld/kiwi_v2
     ln -sf /vendor/etc/wifi/kiwi_v2/WCNSS_qcom_cfg.ini \
         /vendor/firmware/wlan/qca_cld/kiwi_v2/WCNSS_qcom_cfg.ini
-    ln -sf "$work/persist/wlan/wlan_mac.bin" \
-        /vendor/firmware/wlan/qca_cld/kiwi_v2/wlan_mac.bin
+    calibration=''
+    for candidate in "$work/persist/kiwi_v2/wlan_mac.bin" "$work/persist/wlan/wlan_mac.bin"; do
+        if [ -f "$candidate" ]; then calibration=$candidate; break; fi
+    done
+    [ -n "$calibration" ] || fail 'matching persist WLAN calibration is unavailable'
+    ln -sf "$calibration" /vendor/firmware/wlan/qca_cld/kiwi_v2/wlan_mac.bin
 
     if [ ! -d /sys/module/qca_cld3_kiwi_v2 ]; then
         block="/dev/block/mapper/vendor_dlkm$suffix"
@@ -110,6 +124,19 @@ prepare() {
         mount_filesystem "$block" "$work/vendor_dlkm"
         modules="$work/vendor_dlkm/lib/modules"
         [ -s "$modules/modules.dep" ] || fail 'module dependency file missing'
+        # GKI modules use a separate partition; this ROM has both versioned
+        # and flattened layouts. Pick the actual directory, not a broken link.
+        system_modules=''
+        system_block="/dev/block/mapper/system_dlkm$suffix"
+        [ -e "$system_block" ] || system_block=/dev/block/mapper/system_dlkm
+        if [ -e "$system_block" ]; then
+            mount_filesystem "$system_block" "$work/system_dlkm"
+            for candidate in "$work/system_dlkm/flatten/lib/modules" \
+                             "$work/system_dlkm/lib/modules" \
+                             "$work/system_dlkm/lib/modules/"*; do
+                if [ -f "$candidate/rfkill.ko" ]; then system_modules=$candidate; break; fi
+            done
+        fi
         if [ -w /sys/kernel/cnss/fs_ready ]; then
             echo 1 > /sys/kernel/cnss/fs_ready
         fi
@@ -152,7 +179,7 @@ cleanup() {
     stop_dhcp || fail 'DHCP worker did not stop'
     clear_network
     if [ -e "/sys/class/net/$iface" ]; then ifconfig "$iface" down || true; fi
-    rm -f "$work/dhcp.ok" "$work/dhcp.failed" /tmp/recovery/sockets/wlan0
+    rm -f "$work/dhcp.ok" "$work/dhcp.failed" "$work/dhcp.bound" "$work/udhcpc.pid" /tmp/recovery/sockets/wlan0
     note 'DHCP stopped; WLAN address, routes and DNS cleared'
 }
 
@@ -162,7 +189,7 @@ dhcp_failed() {
     rm -f "$work/dhcp.request"
     stop_dhcp || fail 'DHCP worker did not stop'
     clear_network
-    rm -f "$work/dhcp.ok" "$work/dhcp.failed"
+    rm -f "$work/dhcp.ok" "$work/dhcp.failed" "$work/dhcp.bound" "$work/udhcpc.pid"
 }
 
 dhcp_worker() {
@@ -170,15 +197,24 @@ dhcp_worker() {
     request=$(read_state dhcp.request)
     session=$(read_state session)
     [ -n "$session" ] && [ "${request%%:*}" = "$session" ] || exit 1
-    # The AOSP recovery tool performs one IPv4 DHCP transaction and exits.
-    # Do not use the upstream prebuilt daemon's /data/misc/dhcp state.
-    if ! dhcpdbg "$iface" > "$work/dhcp.log" 2>&1; then
+    rm -f "$work/dhcp.bound"
+    # BusyBox handles packet-socket checksum-offload metadata on this driver.
+    # Run one bounded transaction in the init-managed process group, with all
+    # state in RAM and a callback that validates options and the current session.
+    if ! HOUJI_WIFI_REQUEST="$request" HOUJI_WIFI_SESSION="$session" \
+        busybox udhcpc -i "$iface" -f -q -n -t 3 -T 5 \
+        -p "$work/udhcpc.pid" -s /system/bin/houji-wifi-udhcpc-event \
+        > "$work/dhcp.log" 2>&1; then
         echo "$request" > "$work/dhcp.failed"
         exit 1
     fi
     [ "$(getprop init.svc.wpa_supplicant)" = running ] || exit 1
     [ "$(read_state session)" = "$session" ] || exit 1
     [ "$(read_state dhcp.request)" = "$request" ] || exit 1
+    if [ "$(read_state dhcp.bound)" != "$request" ]; then
+        echo "$request" > "$work/dhcp.failed"
+        exit 1
+    fi
     address=$(ifconfig "$iface" | awk '
         /inet / { for (i=1;i<=NF;i++) {
             if ($i ~ /^addr:/) {sub(/^addr:/,"",$i); print $i; exit}

@@ -199,10 +199,8 @@ TW_LOAD_VENDOR_MODULES_EXCLUDE_GKI := true
 # vendor_dlkm modules and modem firmware; do not add WLAN to boot-time loading.
 ifeq ($(TARGET_PRODUCT),twrp_houji_wifi)
 TW_INCLUDE_WIFI := true
-TARGET_RECOVERY_DEVICE_MODULES += dhcpdbg libnetutils libnl libssl
-RECOVERY_BINARY_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/dhcpdbg
+TARGET_RECOVERY_DEVICE_MODULES += libnl libssl
 RECOVERY_LIBRARY_SOURCE_FILES += \
-    $(TARGET_OUT_SHARED_LIBRARIES)/libnetutils.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libssl.so
 endif
