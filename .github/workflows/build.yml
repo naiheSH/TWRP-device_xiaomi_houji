@@ -3,6 +3,11 @@ name: Build houji LVGL recovery
 on:
   workflow_dispatch:
     inputs:
+      variant:
+        description: Recovery variant (Wi-Fi is experimental)
+        type: choice
+        options: ['standard', 'wifi']
+        default: 'standard'
       jobs:
         description: Parallel build jobs (lower this if the runner runs out of memory)
         type: choice
@@ -21,6 +26,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 350
     env:
+      BUILD_VARIANT: ${{ inputs.variant }}
       BUILD_JOBS: ${{ inputs.jobs }}
       SOURCE_DIR: /mnt/twrp
       MANIFEST_REVISION: 814b553116ceedde197f70389cff9661d81d8337
@@ -51,7 +57,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: twrp-lvgl-houji-${{ github.run_number }}
+          name: twrp-lvgl-houji${{ inputs.variant == 'wifi' && '-wifi' || '' }}-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 30

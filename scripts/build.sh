@@ -9,7 +9,12 @@ cd "$SOURCE_DIR"
 export ALLOW_MISSING_DEPENDENCIES=true
 source build/envsetup.sh
 # The Android 16 build fork requires product + release configuration + variant.
-lunch twrp_houji bp2a eng
+case ${BUILD_VARIANT:-standard} in
+  standard) product=twrp_houji; inspection_args=() ;;
+  wifi) product=twrp_houji_wifi; inspection_args=(--wifi) ;;
+  *) echo 'Invalid build variant' >&2; exit 1 ;;
+esac
+lunch "$product" bp2a eng
 [[ $(get_build_var TARGET_DEVICE) == houji ]]
 mka -j"$BUILD_JOBS" recoveryimage assemble_vintf
 platform_libcxx=out/target/product/houji/system/lib64/libc++.so
@@ -53,9 +58,14 @@ print(f'houji recovery image: {p.stat().st_size} bytes')
 PY
 # Inspect the final archive after all device ramdisk overlays have been copied.
 # A successful link alone cannot detect a library overwritten during packaging.
-python3 "$GITHUB_WORKSPACE/scripts/inspect-image.py" "$image" \
+python3 "$GITHUB_WORKSPACE/scripts/inspect-image.py" "$image" "${inspection_args[@]}" \
   --report "$GITHUB_WORKSPACE/logs/image-inspection.json"
 suffix="${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:8}"
+if [[ ${BUILD_VARIANT:-standard} == wifi ]]; then
+  suffix="wifi-$suffix"
+  cp "$GITHUB_WORKSPACE/logs/recovery-patches.sha256" "$GITHUB_WORKSPACE/artifacts/"
+  cp "$GITHUB_WORKSPACE/wifi/gui2-dhcp.patch" "$GITHUB_WORKSPACE/artifacts/"
+fi
 cp "$image" "$GITHUB_WORKSPACE/artifacts/twrp-lvgl-houji-${suffix}.img"
 cp "$GITHUB_WORKSPACE/logs/source-manifest.xml" "$GITHUB_WORKSPACE/artifacts/"
 cp "$GITHUB_WORKSPACE/logs/device-commit.txt" "$GITHUB_WORKSPACE/artifacts/"
@@ -66,6 +76,7 @@ cd "$GITHUB_WORKSPACE/artifacts"
 sha256sum ./*.img > SHA256SUMS
 {
   echo '### houji LVGL recovery compiled'
+  echo "Variant: ${BUILD_VARIANT:-standard}"
   echo 'Download the image and SHA256SUMS from this run’s artifact.'
   echo 'A successful build does not verify boot, touch, or Android 14–17 data decryption.'
 } >> "$GITHUB_STEP_SUMMARY"

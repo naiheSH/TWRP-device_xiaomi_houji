@@ -29,8 +29,11 @@ logical-partition details.
 ## Build with GitHub Actions
 
 1. Open **Actions → Build houji LVGL recovery → Run workflow**.
-2. Choose **4** parallel jobs, or **2** if the runner runs out of memory.
-3. Download the `twrp-lvgl-houji-<run-number>` artifact after a successful build.
+2. Keep the **standard** variant for the default image. The **wifi** variant is
+   [experimental](wifi/README.md) and still needs device validation. Choose
+   **4** parallel jobs, or **2** if the runner runs out of memory.
+3. Download the `twrp-lvgl-houji-<run-number>` artifact after a successful build
+   (`twrp-lvgl-houji-wifi-<run-number>` for the experimental variant).
 4. Verify the image against the included `SHA256SUMS` before installing it.
 
 Artifacts include the image, source revisions, image inspection results and

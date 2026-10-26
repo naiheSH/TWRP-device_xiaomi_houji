@@ -9,6 +9,7 @@ import subprocess
 
 import elfcheck
 import vintfcheck
+import wificheck
 
 
 def cpio_entries(data):
@@ -42,6 +43,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--wifi', action='store_true', help='Require the experimental Wi-Fi runtime')
     args = parser.parse_args()
     image = args.image.read_bytes()
     if not 4096 <= len(image) <= 104857600 or image[:8] != b'ANDROID!':
@@ -61,6 +63,7 @@ def main():
             stderr=subprocess.PIPE, check=True,
         ).stdout
     entries = cpio_entries(ramdisk)
+    wifi_report = wificheck.check(elfcheck.cpio_entries(ramdisk)) if args.wifi else None
     elf_report = elfcheck.check_image(image)
     vintf_report = vintfcheck.check_files({
         name: entry.data for name, entry in elfcheck.unpack_recovery(image).items()
@@ -93,12 +96,15 @@ def main():
         'missing': missing,
         'elf_check': elf_report,
         'recovery_vintf': vintf_report,
+        'wifi': wifi_report,
         'scope': 'Packaging inspection only; boot and data decryption are unverified.',
     }
     rendered = json.dumps(report, indent=2, ensure_ascii=False) + '\n'
     print(rendered, end='')
     if args.report:
         args.report.write_text(rendered)
+    if wifi_report and any(wifi_report[k] for k in ('missing', 'errors', 'elf_failures')):
+        raise SystemExit('Incomplete experimental Wi-Fi runtime')
     if missing or elf_report['failures'] or vintf_report['missing'] or vintf_report['errors']:
         raise SystemExit('Recovery image has missing files, an ELF closure failure, or incomplete recovery VINTF')
 

@@ -194,3 +194,15 @@ TW_OMAPI_UUID := 534552454144595f48414c5f55554944
 # Modules Load
 TW_LOAD_VENDOR_MODULES := "adsp_loader_dlkm.ko synaptics_tcm2.ko nxp-nci.ko stm_st54se_gpio.ko stm_nfc_i2c.ko"
 TW_LOAD_VENDOR_MODULES_EXCLUDE_GKI := true
+
+# Optional recovery-only Wi-Fi product. Use the installed ROM's matching
+# vendor_dlkm modules and modem firmware; do not add WLAN to boot-time loading.
+ifeq ($(TARGET_PRODUCT),twrp_houji_wifi)
+TW_INCLUDE_WIFI := true
+TARGET_RECOVERY_DEVICE_MODULES += dhcpdbg libnetutils libnl libssl
+RECOVERY_BINARY_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/dhcpdbg
+RECOVERY_LIBRARY_SOURCE_FILES += \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libnetutils.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libssl.so
+endif

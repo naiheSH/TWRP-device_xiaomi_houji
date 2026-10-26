@@ -25,6 +25,18 @@ for attempt in 1 2 3; do
 done
 [[ $synced == true ]] || exit 1
 test "$(git -C bootable/recovery rev-parse HEAD)" = "$RECOVERY_REVISION"
+# Only the experimental product replaces the hardcoded DHCP daemon call.
+# The patch is part of the device revision recorded in the build artifact.
+case ${BUILD_VARIANT:-standard} in
+  standard) ;;
+  wifi)
+    git -C bootable/recovery apply --check "$GITHUB_WORKSPACE/wifi/gui2-dhcp.patch"
+    git -C bootable/recovery apply "$GITHUB_WORKSPACE/wifi/gui2-dhcp.patch"
+    sha256sum "$GITHUB_WORKSPACE/wifi/gui2-dhcp.patch" \
+      > "$GITHUB_WORKSPACE/logs/recovery-patches.sha256"
+    ;;
+  *) echo 'Invalid build variant' >&2; exit 1 ;;
+esac
 test -f external/lvgl/Android.bp
 test -d bootable/recovery/gui2
 grep -q liblvgl_twrp bootable/recovery/Android.bp

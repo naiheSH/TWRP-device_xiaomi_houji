@@ -48,3 +48,14 @@ print('kernel SHA256:', hashlib.sha256(kernel.read_bytes()).hexdigest())
 vintf = vintfcheck.check_source(root)
 assert not vintf['missing'] and not vintf['errors'], vintf
 print('recovery system VINTF declarations: OK')
+
+# Wi-Fi is an explicit alternate product; the default image stays independent.
+assert 'twrp_houji_wifi.mk' in (root / 'AndroidProducts.mk').read_text()
+wifi_product = (root / 'twrp_houji_wifi.mk').read_text()
+assert 'wpa_supplicant_recovery' in wifi_product and 'wpa_cli_recovery' in wifi_product
+assert 'ifeq ($(TARGET_PRODUCT),twrp_houji_wifi)' in board
+assert 'update_config=0' in (root / 'wifi/wpa_supplicant.conf').read_text()
+assert 'HOUJI_WIFI_DHCP_OK' in (root / 'wifi/gui2-dhcp.patch').read_text()
+for name in ('houji-wifi-control.sh', 'houji-wifi-dhcp.sh'):
+    assert (root / 'wifi' / name).stat().st_mode & 0o111
+print('Optional houji Wi-Fi product inputs: OK')

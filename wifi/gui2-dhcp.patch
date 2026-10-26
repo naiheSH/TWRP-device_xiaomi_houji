@@ -1,0 +1,194 @@
+--- a/gui2/backend/twrp_wifi_backend.cpp
++++ b/gui2/backend/twrp_wifi_backend.cpp
+@@ -324,9 +324,13 @@
+     return;
+   }
+ 
+-  note("Link established, requesting an address with dhcpcd...\n");
+-  run(std::string("dhcpcd ") + kInterface);
+-  sleep(5);
++  note("Link established, requesting an IPv4 address...\n");
++  const std::string dhcp_reply = run(std::string("houji-wifi-dhcp ") + kInterface);
++  if (dhcp_reply.find("HOUJI_WIFI_DHCP_OK") == std::string::npos) {
++    note("DHCP failed or Wi-Fi was disabled\n");
++    finish(false);
++    return;
++  }
+ 
+   const std::string address = first_line_of(std::string("ifconfig ") + kInterface +
+                                             " | grep 'inet ' | awk -F'[: ]+' '{print $4}'");
+--- a/gui/action.cpp
++++ b/gui/action.cpp
+@@ -2459,168 +2459,11 @@
+ // ===== GUIAction::wlanconnect =====
+ int GUIAction::wlanconnect(std::string arg __unused) {
+     GUIBorderedLogBox* logBox = FindWlanLogBox();
+-    if (!logBox) {
+-        LOGERR("WLAN log box not found\n");
+-        return -1;
++    if (logBox) {
++        logBox->AddLogLine("[ERROR] Experimental Wi-Fi requires LVGL. Reboot recovery to return to LVGL.", "error");
++        gui_forceRender();
+     }
+-
+-    // 读取选中的 WLAN
+-    std::string selectedWlan = DataManager::GetStrValue("tw_selected_wlan");
+-    if (selectedWlan.empty()) {
+-        selectedWlan = "MyHomeWiFi";
+-        LOGINFO("[DEBUG] SelectedWlan empty, using fallback MyHomeWiFi\n");
+-    }
+-
+-    // 获取密码
+-    std::string password;
+-    DataManager::GetValue("tw_wlan_password", password);
+-
+-    // 获取选中的WLAN的加密方式
+-    std::string encryption = DataManager::GetStrValue("tw_selected_wlan_encryption");
+-    
+-    logBox->AddLogLine("[INFO] Connecting to network...", "normal");
+-    logBox->AddLogLine("[INFO] SSID: " + selectedWlan, "normal");
+-    logBox->AddLogLine("[INFO] Encryption: " + encryption, "normal");
+-    
+-    if (!password.empty()) {
+-        logBox->AddLogLine("[INFO] Using password authentication", "normal");
+-    } else {
+-        logBox->AddLogLine("[INFO] No password provided (open network)", "normal");
+-    }
+-    gui_forceRender();
+-
+-    const char* IFACE = "wlan0";
+-    const char* CTRL_DIR = "/tmp/recovery/sockets";
+-    const char* WPACLI = "wpa_cli";
+-
+-    // 先移除 network 0，保证干净
+-    run_command_get_output(std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " remove_network 0");
+-    run_command_get_output(std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " add_network");
+-
+-    // 设置 SSID
+-    std::string cmd_set_ssid = std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " set_network 0 ssid '\"" + selectedWlan + "\"'";
+-    run_command_get_output(cmd_set_ssid);
+-
+-    // ========= 根据加密方式设置 key_mgmt =========
+-    std::string key_mgmt;
+-    if (encryption == "Open") {
+-        key_mgmt = "NONE";
+-        logBox->AddLogLine("[INFO] Using open network authentication", "normal");
+-    } else if (encryption == "WPA3") {
+-        key_mgmt = "SAE";
+-        logBox->AddLogLine("[INFO] Using WPA3-SAE authentication", "normal");
+-    } else if (encryption == "WPA2") {
+-        key_mgmt = "WPA-PSK";
+-        logBox->AddLogLine("[INFO] Using WPA2-PSK authentication", "normal");
+-    } else if (encryption == "WPA") {
+-        key_mgmt = "WPA-PSK";
+-        logBox->AddLogLine("[INFO] Using WPA-PSK authentication", "normal");
+-    } else {
+-        // 默认使用WPA-PSK，兼容旧版本
+-        key_mgmt = "WPA-PSK";
+-        logBox->AddLogLine("[INFO] Using default WPA-PSK authentication", "normal");
+-    }
+-
+-    std::string cmd_set_key_mgmt = std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " set_network 0 key_mgmt " + key_mgmt;
+-    run_command_get_output(cmd_set_key_mgmt);
+-
+-    // 设置 PSK（仅当需要密码时）
+-    if (!password.empty()) {
+-        if (encryption == "Open") {
+-            logBox->AddLogLine("[WARNING] Open network should not have password, ignoring password", "warning");
+-        } else {
+-            uint8_t psk[32];
+-			std::string cmd_set_psk = std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " set_network 0 psk '\"" + password + "\"'";
+-            run_command_get_output(cmd_set_psk);
+-        }
+-    } else {
+-        if (encryption != "Open") {
+-            logBox->AddLogLine("[WARNING] Password required for encrypted network", "warning");
+-            // 对于加密网络但没有密码的情况，可能需要特殊处理
+-            if (encryption == "WPA3" || encryption == "WPA2" || encryption == "WPA") {
+-                logBox->AddLogLine("[ERROR] Password is required for " + encryption + " network", "error");
+-                gui_forceRender();
+-                return -1;
+-            }
+-        }
+-    }
+-
+-    // 启用 network 0
+-    run_command_get_output(std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " enable_network 0");
+-
+-    logBox->AddLogLine("[INFO] Authenticating...", "normal");
+-    gui_forceRender();
+-
+-    // 等待连接完成
+-    bool connected = false;
+-    for (int i = 0; i < 20; i++) {
+-        std::string status = run_command_get_output(std::string(WPACLI) + " -i" + IFACE + " -p" + CTRL_DIR + " status");
+-        if (status.find("wpa_state=COMPLETED") != std::string::npos) {
+-            connected = true;
+-            break;
+-        }
+-        ::sleep(1);
+-    }
+-
+-    if (!connected) {
+-        logBox->AddLogLine("[ERROR] Failed to connect (timeout or authentication error)", "error");
+-        gui_forceRender();
+-        return -1;
+-    }
+-
+-    // 请求 IP
+-    logBox->AddLogLine("[INFO] Wi-Fi link established, requesting IP with dhcpcd...", "normal");
+-    gui_forceRender();
+-    run_command_get_output("dhcpcd wlan0");
+-    ::sleep(5); // 等 dhcpcd 配置完成
+-
+-    // 获取 IP 地址
+-    std::string ip_address = run_command_get_output("ifconfig wlan0 | grep 'inet ' | awk -F'[: ]+' '{print $4}'");
+-    while (!ip_address.empty() && (ip_address.back() == '\n' || ip_address.back() == '\r'))
+-        ip_address.pop_back();
+-
+-    // 获取网关
+-    std::string gateway = run_command_get_output("netstat -rn | grep wlan0 | grep UG | awk '{print $2}'");
+-    while (!gateway.empty() && (gateway.back() == '\n' || gateway.back() == '\r'))
+-        gateway.pop_back();
+-
+-    // 获取 DNS
+-    std::vector<std::string> dns_servers;
+-    FILE* fp = fopen("/etc/resolv.conf", "r");
+-    if (fp) {
+-        char buf[256];
+-        while (fgets(buf, sizeof(buf), fp)) {
+-            std::string line(buf);
+-            if (line.find("nameserver") == 0) {
+-                std::istringstream ls(line);
+-                std::string key, value;
+-                ls >> key >> value;
+-                if (!value.empty()) {
+-                    while (!value.empty() && (value.back() == '\n' || value.back() == '\r')) value.pop_back();
+-                    dns_servers.push_back(value);
+-                }
+-            }
+-        }
+-        fclose(fp);
+-    }
+-
+-    logBox->AddLogLine("[INFO] Connected successfully", "normal");
+-    logBox->AddLogLine("[INFO] IP Address: " + (ip_address.empty() ? "(unknown)" : ip_address), "normal");
+-    logBox->AddLogLine("[INFO] Gateway: " + (gateway.empty() ? "(unknown)" : gateway), "normal");
+-
+-    if (!dns_servers.empty()) {
+-        std::string dns_line = "[INFO] DNS: ";
+-        for (size_t i = 0; i < dns_servers.size(); i++) {
+-            if (i > 0) dns_line += ", ";
+-            dns_line += dns_servers[i];
+-        }
+-        logBox->AddLogLine(dns_line, "normal");
+-    } else {
+-        logBox->AddLogLine("[INFO] DNS: (unknown)", "normal");
+-    }
+-
+-    gui_forceRender();
+-    return 0;
++    return -1;
+ }
+ 
+ int GUIAction::wlangetstatus(std::string arg __unused) {
