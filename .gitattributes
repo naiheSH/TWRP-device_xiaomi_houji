@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Patch context preserves whitespace from the pinned upstream source.
+wifi/*.patch -whitespace
